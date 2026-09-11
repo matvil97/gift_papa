@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L'Histoire de Papa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0a1e;
+    --bg2:#141133;
+    --ink:#f4f0ff;
+    --cyan:#57e8d8;
+    --gold:#ffd166;
+    --pink:#ff6b9d;
+    --dim:#9a93c9;
+    --pixel:'Press Start 2P', 'Courier New', monospace;
+    --read:'VT323', 'Courier New', monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--read);
+    overflow:hidden;
+    -webkit-font-smoothing:none;
+  }
+  #app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+
+  /* ---------- CRT / scanline overlay ---------- */
+  .crt::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:60;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 2px,rgba(0,0,0,0) 2px 4px);
+    mix-blend-mode:multiply;
+  }
+  .crt::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:61;
+    background:radial-gradient(120% 120% at 50% 50%,rgba(0,0,0,0) 55%,rgba(0,0,0,.55) 100%);
+  }
+  @keyframes flick{0%,97%,100%{opacity:1}98%{opacity:.86}99%{opacity:.95}}
+  #app{animation:flick 6s infinite steps(1)}
+
+  .screen{width:100%;height:100%;position:absolute;inset:0;display:none;flex-direction:column;
+    align-items:center;justify-content:center;padding:24px}
+  .screen.active{display:flex}
+
+  /* ---------- Menu ---------- */
+  #menu{
+    background:
+      radial-gradient(140% 100% at 50% 0%,#241a55 0%,var(--bg) 60%);
+  }
+  .stars{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .star{position:absolute;width:4px;height:4px;background:var(--gold);opacity:.7;
+    animation:rise linear infinite}
+  .star.c{background:var(--cyan)} .star.p{background:var(--pink)}
+  @keyframes rise{from{transform:translateY(20px)}to{transform:translateY(-105vh)}}
+
+  .title-wrap{text-align:center;z-index:2;margin-bottom:6vh}
+  .title-wrap .sub{font-family:var(--pixel);font-size:clamp(8px,2.2vw,12px);color:var(--cyan);
+    letter-spacing:2px;margin-bottom:18px}
+  .title-wrap h1{font-family:var(--pixel);line-height:1.5;color:var(--gold);
+    font-size:clamp(18px,6vw,40px);text-shadow:4px 4px 0 var(--pink),8px 8px 0 rgba(0,0,0,.4)}
+  .title-wrap .yr{font-family:var(--pixel);font-size:clamp(9px,2.6vw,14px);color:var(--ink);margin-top:20px}
+
+  .menu-list{z-index:2;display:flex;flex-direction:column;gap:14px;align-items:center}
+  .menu-item{font-family:var(--pixel);font-size:clamp(10px,3vw,16px);color:var(--ink);
+    background:none;border:none;cursor:pointer;padding:10px 22px;letter-spacing:1px;
+    position:relative;transition:color .1s}
+  .menu-item:hover,.menu-item.sel{color:var(--gold)}
+  .menu-item.sel::before{content:"\25B6";position:absolute;left:-6px;color:var(--pink);
+    animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .press{font-family:var(--pixel);font-size:clamp(8px,2.4vw,11px);color:var(--dim);
+    margin-top:5vh;z-index:2;animation:blink 1.2s steps(1) infinite}
+  .credits-box{z-index:2;font-family:var(--pixel);font-size:clamp(8px,2.4vw,11px);
+    color:var(--cyan);line-height:2;text-align:center;max-width:560px;margin-top:24px;display:none}
+
+  /* ---------- Story ---------- */
+  #story{background:linear-gradient(180deg,#0b0a1e,#0e0b28)}
+  .stage{width:min(940px,100%);height:100%;display:flex;flex-direction:column;
+    padding:clamp(14px,3vw,34px);gap:16px;overflow:hidden}
+  .chapline{display:flex;justify-content:space-between;align-items:baseline;
+    font-family:var(--pixel);font-size:clamp(7px,2vw,10px);color:var(--cyan);letter-spacing:1px}
+  .chapline .date{color:var(--gold)}
+  .body-area{flex:1;display:flex;flex-direction:column;gap:16px;min-height:0;justify-content:center;
+    overflow:hidden}
+  .chap-title{font-family:var(--pixel);font-size:clamp(12px,3.6vw,20px);color:var(--gold);
+    line-height:1.6;text-shadow:3px 3px 0 rgba(0,0,0,.5)}
+  .photos{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .pw{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;max-width:100%}
+  .photo{border:4px solid var(--ink);background:#000;padding:5px;box-shadow:8px 8px 0 rgba(0,0,0,.45);
+    max-width:100%}
+  .photo img{display:block;max-height:calc(38vh - 18px);max-width:100%;width:auto;
+    image-rendering:auto;filter:saturate(1.05) contrast(1.03)}
+  .photos.dual .pw{max-width:47%}
+  .photos.dual .photo img{max-height:calc(25vh - 18px)}
+  .cap{font-size:clamp(13px,1.9vw,16px);line-height:1.3;color:var(--cyan);text-align:center;
+    max-width:34ch;font-style:italic}
+  .chap-text{font-size:clamp(17px,3vw,24px);line-height:1.4;color:var(--ink);
+    max-width:52ch;min-height:2em}
+  .chap-text .caret{color:var(--pink);animation:blink .8s steps(1) infinite}
+
+  .foot{display:flex;flex-direction:column;gap:10px}
+  .bar{height:10px;background:#241f47;border:2px solid var(--dim);position:relative;overflow:hidden}
+  .bar > i{position:absolute;inset:0;width:0;background:linear-gradient(90deg,var(--cyan),var(--gold));
+    display:block}
+  .dots{display:flex;gap:6px;justify-content:center}
+  .dot{width:10px;height:10px;background:#2c2652;border:2px solid var(--dim)}
+  .dot.on{background:var(--gold);border-color:var(--gold)}
+  .dot.done{background:var(--cyan);border-color:var(--cyan)}
+  .ctrls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .ctrl{font-family:var(--pixel);font-size:10px;color:var(--ink);background:#1c1840;
+    border:2px solid var(--dim);padding:9px 12px;cursor:pointer}
+  .ctrl:hover{border-color:var(--gold);color:var(--gold)}
+
+  /* ---------- Ending ---------- */
+  #end{background:radial-gradient(140% 100% at 50% 0%,#3a1d55 0%,var(--bg) 65%);text-align:center}
+  #end h2{font-family:var(--pixel);font-size:clamp(15px,5vw,34px);color:var(--gold);line-height:1.6;
+    text-shadow:4px 4px 0 var(--pink);z-index:2}
+  #end .when{font-family:var(--pixel);font-size:clamp(9px,2.6vw,14px);color:var(--cyan);margin-top:16px;z-index:2}
+  #end .final-photo{border:4px solid var(--ink);padding:5px;background:#000;margin:22px 0;
+    box-shadow:8px 8px 0 rgba(0,0,0,.45);z-index:2;max-height:34vh}
+  #end .final-photo img{display:block;max-height:calc(34vh - 18px);max-width:100%}
+  #end p{font-size:clamp(18px,3.4vw,24px);max-width:40ch;line-height:1.5;z-index:2;color:var(--ink)}
+  .confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+  .cf{position:absolute;top:-16px;width:8px;height:8px;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(115vh) rotate(540deg)}}
+
+  .mute{position:fixed;top:12px;right:14px;z-index:62;font-family:var(--pixel);font-size:9px;
+    color:var(--ink);background:#1c1840;border:2px solid var(--dim);padding:8px 10px;cursor:pointer}
+  .mute:hover{border-color:var(--gold);color:var(--gold)}
+
+  /* ---------- Questions interactives ---------- */
+  #question{background:radial-gradient(140% 100% at 50% 0%,#2a1a55 0%,var(--bg) 65%);text-align:center}
+  .q-inner{z-index:2;display:flex;flex-direction:column;align-items:center;gap:34px;
+    padding:24px;max-width:760px}
+  .q-text{font-family:var(--pixel);font-size:clamp(15px,4.5vw,30px);color:var(--gold);
+    line-height:1.7;text-shadow:3px 3px 0 var(--pink);white-space:pre-line}
+  .q-btns{display:flex;gap:22px;align-items:center;justify-content:center;min-height:64px}
+  .q-yes{font-family:var(--pixel);font-size:clamp(13px,3.6vw,20px);color:#0b0a1e;
+    background:var(--cyan);border:none;padding:16px 34px;cursor:pointer;
+    box-shadow:5px 5px 0 rgba(0,0,0,.4)}
+  .q-yes:hover{background:var(--gold)}
+  .q-yes:disabled{opacity:.5;cursor:default}
+  .q-no{font-family:var(--pixel);font-size:clamp(13px,3.6vw,20px);color:var(--ink);
+    background:#1c1840;border:2px solid var(--dim);padding:16px 30px;cursor:not-allowed;
+    position:fixed;z-index:5;transition:left .18s ease, top .18s ease}
+  .q-note{font-family:var(--read);font-size:clamp(17px,2.8vw,22px);color:var(--cyan);
+    min-height:1.6em;font-style:italic}
+
+  @media (max-width:560px){
+    .chapline{flex-direction:column;gap:3px;align-items:flex-start}
+    .photo img{max-height:calc(27vh - 18px)}
+    .photos.dual{flex-wrap:nowrap}
+    .photos.dual .pw{max-width:47%}
+    .photos.dual .photo img{max-height:calc(20vh - 18px)}
+    .chap-text{font-size:16px;line-height:1.35;max-width:none}
+    .cap{font-size:12.5px}
+  }
+  @media (max-width:560px) and (max-height:740px){
+    .photo img{max-height:calc(23vh - 18px)}
+    .photos.dual .photo img{max-height:calc(17vh - 18px)}
+  }
+</style>
+</head>
+<body class="crt">
+<div id="app">
+
+  <!-- ================= MENU ================= -->
+  <section id="menu" class="screen active">
+    <div class="stars" id="stars"></div>
+    <div class="title-wrap">
+      <div class="sub">STUDIO MATTHIEU &nbsp;PRESENTE</div>
+      <h1>L'HISTOIRE<br>DE PAPA</h1>
+      <div class="yr">1968 &nbsp;&#9679;&nbsp; 2026</div>
+    </div>
+    <div class="menu-list" id="menuList">
+      <button class="menu-item sel" data-act="story">MODE HISTOIRE</button>
+      <button class="menu-item" data-act="music">MUSIQUE : ON</button>
+      <button class="menu-item" data-act="credits">CREDITS</button>
+    </div>
+    <div class="credits-box" id="creditsBox">
+      FAIT AVEC &#9829; PAR TON FILS<br>POUR TES 58 ANS &#8212; 14 . 09 . 2026
+    </div>
+    <div class="press">APPUIE SUR ENTREE</div>
+  </section>
+
+  <!-- ================= STORY ================= -->
+  <section id="story" class="screen">
+    <div class="stage">
+      <div class="chapline">
+        <span id="chapNum">CHAPITRE 1 / 6</span>
+        <span class="date" id="chapDate"></span>
+      </div>
+      <div class="body-area">
+        <div class="chap-title" id="chapTitle"></div>
+        <div class="photos" id="chapPhotos"></div>
+        <div class="chap-text" id="chapText"></div>
+      </div>
+      <div class="foot">
+        <div class="bar"><i id="barFill"></i></div>
+        <div class="dots" id="dots"></div>
+        <div class="ctrls">
+          <button class="ctrl" data-nav="prev">&#9198; PREC.</button>
+          <button class="ctrl" data-nav="toggle" id="btnToggle">&#9208; PAUSE</button>
+          <button class="ctrl" data-nav="next">SUIV. &#9197;</button>
+          <button class="ctrl" data-nav="menu">MENU</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= QUESTIONS ================= -->
+  <section id="question" class="screen">
+    <div class="q-inner">
+      <div class="q-text" id="qText"></div>
+      <div class="q-btns">
+        <button class="q-yes" id="qYes">OUI</button>
+        <button class="q-no" id="qNo" tabindex="-1">NON</button>
+      </div>
+      <div class="q-note" id="qNote"></div>
+    </div>
+  </section>
+
+  <!-- ================= END ================= -->
+  <section id="end" class="screen">
+    <div class="confetti" id="confetti"></div>
+    <h2>BON ANNIVERSAIRE<br>PAPA</h2>
+    <div class="when">58 ANS &nbsp;&#9679;&nbsp; 14 . 09 . 2026</div>
+    <div class="final-photo"><img src="IMG_3042.JPG" alt="Papa aujourd'hui"></div>
+    <p>Merci pour tout. On t'aime.</p>
+    <div class="ctrls" style="margin-top:22px">
+      <button class="ctrl" data-nav="replay">&#8635; REVOIR</button>
+      <button class="ctrl" data-nav="menu">MENU</button>
+    </div>
+  </section>
+
+</div>
+<button class="mute" id="muteBtn">&#9834; SON : ON</button>
+<!-- Musique de fond. Pour en changer : remplace le fichier ci-dessous
+     (garde le meme nom, ou mets a jour le src). Si le fichier est absent,
+     une melodie piano est generee automatiquement. -->
+<audio id="track" loop preload="auto">
+  <source src="grand_project-wonders-of-the-earth-550792.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+/* ============================================================
+   L'HISTOIRE DE PAPA  —  pour modifier l'histoire, edite
+   simplement le tableau CHAPTERS ci-dessous : les dates, les
+   titres, les textes et les photos.  Les images doivent etre
+   dans le meme dossier que ce fichier.
+   ============================================================ */
+
+const CHAPTERS = [
+  {
+    date: "14 SEPTEMBRE 1968",
+    title: "NE EN GUADELOUPE",
+    text: "Sur une ile, sous le soleil des Antilles, un garcon voit le jour. Il ne le sait pas encore, mais cette date deviendra, des annees plus tard, une date a feter deux fois.",
+    photos: []
+  },
+  {
+    date: "1968 - 1974",
+    title: "L'ENFANCE, PUIS LE DEPART",
+    text: "Six annees en Guadeloupe. Puis la vie l'emmene loin des siens, chez un oncle et une tante. Tres tot, il apprend ce que veulent dire les mots : tenir bon.",
+    photos: []
+  },
+  {
+    date: "L'HOMME QU'IL EST DEVENU",
+    title: "DEBOUT, ET DROIT",
+    text: "Il devient un homme de convictions. Un serviteur de Dieu. Ferme, exigeant, avec les autres comme avec lui-meme. On ne le fait pas plier facilement.",
+    photos: [
+      "IMG_3040.JPG",
+      { src: "IMG_3045.JPG", cap: "Et dans la famille, tout le monde le dit : c'est le sosie de Michael Kyle, le pere de \"Ma famille d'abord\"." }
+    ]
+  },
+  {
+    date: "14 SEPTEMBRE 2002",
+    title: "DEUX ANNIVERSAIRES, UN JOUR",
+    text: "Le jour de ses 34 ans, Maman accouche. Sur le gateau, il decouvre une photo : un bebe. Moi. Depuis ce jour, le 14 septembre ne lui appartient plus tout a fait.",
+    photos: ["IMG_3039.JPG"]
+  },
+  {
+    date: "LES ANNEES QUI SUIVENT",
+    title: "FERME, MAIS JUSTE",
+    text: "Petit, je ne comprenais pas pourquoi il etait si dur avec moi. Aujourd'hui, je comprends. Chaque exigence etait une facon de nous preparer, et de faire en sorte qu'on ne manque de rien.",
+    photos: ["IMG_3044.JPG", "IMG_3041.JPG"]
+  },
+  {
+    date: "14 SEPTEMBRE 2026",
+    title: "MERCI, PAPA",
+    text: "58 ans, dont 24 a etre mon pere. Meme si je ne le dis pas souvent : merci. Merci pour ton energie, tes sacrifices, et tout ce que tu nous as donne sans jamais compter. On t'aime.",
+    photos: ["IMG_3042.JPG"]
+  }
+];
+
+const TYPE_MS = 34;      // vitesse de la machine a ecrire
+const READ_MS = 5200;    // temps de lecture apres la fin du texte
+const MIN_CHAPTER_MS = 9000;
+
+/* ---------------- navigation entre ecrans ---------------- */
+const screens = {
+  menu: document.getElementById('menu'),
+  story: document.getElementById('story'),
+  question: document.getElementById('question'),
+  end: document.getElementById('end')
+};
+function show(name){
+  Object.values(screens).forEach(s=>s.classList.remove('active'));
+  screens[name].classList.add('active');
+}
+
+/* ---------------- MENU ---------------- */
+const menuItems = [...document.querySelectorAll('.menu-item')];
+let selIdx = 0;
+function setSel(i){
+  selIdx = (i + menuItems.length) % menuItems.length;
+  menuItems.forEach((m,k)=>m.classList.toggle('sel',k===selIdx));
+}
+function activate(act){
+  if(act==='story'){ startStory(); }
+  else if(act==='music'){ if(!started){ startMusic(); } else { toggleMute(); } }
+  else if(act==='credits'){
+    const b = document.getElementById('creditsBox');
+    b.style.display = b.style.display==='block' ? 'none' : 'block';
+  }
+}
+menuItems.forEach((m,k)=>{
+  m.addEventListener('mouseenter',()=>setSel(k));
+  m.addEventListener('click',()=>{ setSel(k); activate(m.dataset.act); });
+});
+document.addEventListener('keydown',e=>{
+  if(screens.menu.classList.contains('active')){
+    if(e.key==='ArrowDown'){ setSel(selIdx+1); }
+    else if(e.key==='ArrowUp'){ setSel(selIdx-1); }
+    else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(menuItems[selIdx].dataset.act); }
+  } else if(screens.story.classList.contains('active')){
+    if(e.key==='ArrowRight') gotoChapter(cur+1);
+    else if(e.key==='ArrowLeft') gotoChapter(cur-1);
+    else if(e.key===' '){ e.preventDefault(); togglePlay(); }
+    else if(e.key==='Escape') backToMenu();
+  } else if(screens.question.classList.contains('active')){
+    if(e.key==='Escape') backToMenu();
+    else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); qYes.click(); }
+  }
+});
+
+/* falling pixels on menu */
+const starBox = document.getElementById('stars');
+for(let i=0;i<32;i++){
+  const s=document.createElement('div');
+  s.className='star '+(i%3===0?'c':i%3===1?'p':'');
+  s.style.left=Math.random()*100+'%';
+  s.style.bottom=(-10-Math.random()*40)+'px';
+  s.style.animationDuration=(6+Math.random()*8)+'s';
+  s.style.animationDelay=(-Math.random()*10)+'s';
+  starBox.appendChild(s);
+}
+
+/* ---------------- STORY ENGINE ---------------- */
+const elNum=document.getElementById('chapNum');
+const elDate=document.getElementById('chapDate');
+const elTitle=document.getElementById('chapTitle');
+const elPhotos=document.getElementById('chapPhotos');
+const elText=document.getElementById('chapText');
+const barFill=document.getElementById('barFill');
+const dotsBox=document.getElementById('dots');
+const btnToggle=document.getElementById('btnToggle');
+
+let cur=0, playing=true;
+let typeTimer=null, advTimer=null;
+let chapDur=0, chapStart=0, remaining=0, typing=false, fullText="";
+
+CHAPTERS.forEach((_,i)=>{
+  const d=document.createElement('div'); d.className='dot'; d.dataset.i=i;
+  dotsBox.appendChild(d);
+});
+const dotEls=[...dotsBox.children];
+
+function startStory(){
+  startMusic();
+  restartTrack();          // la musique repart du debut a chaque lancement
+  show('story');
+  cur=0; playing=true;
+  renderChapter();
+}
+
+function restartTrack(){
+  if(useTrack && trackEl){
+    try{
+      trackEl.currentTime = 0;
+      if(musicOn && trackEl.paused) trackEl.play().catch(()=>{});
+    }catch(e){}
+  }
+}
+
+function renderChapter(){
+  clearTimeout(typeTimer); clearTimeout(advTimer);
+  const c=CHAPTERS[cur];
+  elNum.textContent=`CHAPITRE ${cur+1} / ${CHAPTERS.length}`;
+  elDate.textContent=c.date;
+  elTitle.textContent=c.title;
+
+  elPhotos.className='photos'+(c.photos.length>1?' dual':'');
+  elPhotos.innerHTML='';
+  c.photos.forEach(p=>{
+    const src = typeof p==='string' ? p : p.src;
+    const cap = typeof p==='string' ? null : p.cap;
+    const pw=document.createElement('div'); pw.className='pw';
+    const f=document.createElement('div'); f.className='photo';
+    const im=document.createElement('img'); im.src=src; im.alt='';
+    f.appendChild(im); pw.appendChild(f);
+    if(cap){
+      const cc=document.createElement('div'); cc.className='cap'; cc.textContent=cap;
+      pw.appendChild(cc);
+    }
+    elPhotos.appendChild(pw);
+  });
+
+  dotEls.forEach((d,i)=>{
+    d.classList.toggle('on',i===cur);
+    d.classList.toggle('done',i<cur);
+  });
+
+  fullText=c.text;
+  elText.innerHTML='<span class="caret">_</span>';
+  btnToggle.innerHTML='&#9208; PAUSE';
+
+  const typeDur=fullText.length*TYPE_MS;
+  chapDur=Math.max(MIN_CHAPTER_MS, typeDur+READ_MS);
+  chapStart=performance.now();
+  remaining=chapDur;
+
+  // progress bar
+  barFill.style.transition='none';
+  barFill.style.width='0%';
+  void barFill.offsetWidth;
+  barFill.style.transition=`width ${chapDur}ms linear`;
+  barFill.style.width='100%';
+
+  typing=true;
+  typeChars(0);
+}
+
+function typeChars(n){
+  if(!playing) return;
+  if(n>fullText.length){
+    typing=false;
+    return;
+  }
+  elText.innerHTML=fullText.slice(0,n)+'<span class="caret">_</span>';
+  typeTimer=setTimeout(()=>typeChars(n+1), TYPE_MS);
+  if(n===fullText.length){
+    typing=false;
+    scheduleAdvance();
+  }
+}
+
+function scheduleAdvance(){
+  clearTimeout(advTimer);
+  if(!playing) return;
+  const elapsed=performance.now()-chapStart;
+  const wait=Math.max(1200, chapDur-elapsed);
+  advTimer=setTimeout(()=>{
+    if(cur>=CHAPTERS.length-1) startQuestions();
+    else gotoChapter(cur+1);
+  }, wait);
+}
+
+function gotoChapter(i){
+  if(i<0) i=0;
+  if(i>CHAPTERS.length-1){ startQuestions(); return; }
+  cur=i;
+  playing=true;
+  renderChapter();
+}
+
+function togglePlay(){
+  playing=!playing;
+  if(playing){
+    btnToggle.innerHTML='&#9208; PAUSE';
+    if(typing){
+      // termine le texte instantanement puis reprend le compte a rebours
+      elText.innerHTML=fullText+'<span class="caret">_</span>';
+      typing=false;
+    }
+    chapStart=performance.now()-(chapDur-remaining);
+    barFill.style.transition=`width ${remaining}ms linear`;
+    barFill.style.width='100%';
+    scheduleAdvance();
+  } else {
+    btnToggle.innerHTML='&#9654; LIRE';
+    clearTimeout(typeTimer); clearTimeout(advTimer);
+    if(typing){                       // termine le texte pour pouvoir le lire en pause
+      elText.innerHTML=fullText+'<span class="caret">_</span>';
+      typing=false;
+    }
+    remaining=Math.max(0, chapDur-(performance.now()-chapStart));
+    const w=getComputedStyle(barFill).width;
+    barFill.style.transition='none';
+    barFill.style.width=w;
+  }
+}
+
+function backToMenu(){
+  clearTimeout(typeTimer); clearTimeout(advTimer);
+  playing=false;
+  show('menu');
+}
+
+function finish(){
+  clearTimeout(typeTimer); clearTimeout(advTimer);
+  show('end');
+  spawnConfetti();
+}
+
+/* ---------------- QUESTIONS INTERACTIVES ---------------- */
+const QUESTIONS = [
+  "Es-tu fier de nous ?",
+  "Es-tu heureux ?",
+  "Nous sommes fiers de toi.\nTu le sais ?"
+];
+const ACKS = [
+  "...merci, papa.",
+  "c'est tout ce qu'on souhaite.",
+  "voila. maintenant, c'est dit."
+];
+const qText=document.getElementById('qText');
+const qYes=document.getElementById('qYes');
+const qNo=document.getElementById('qNo');
+const qNote=document.getElementById('qNote');
+let qIdx=0;
+
+function startQuestions(){
+  clearTimeout(typeTimer); clearTimeout(advTimer);
+  playing=false;
+  qIdx=0;
+  showQuestion();
+}
+
+function showQuestion(){
+  show('question');
+  qText.textContent = QUESTIONS[qIdx];
+  qNote.textContent = '';
+  qYes.disabled = false;
+  requestAnimationFrame(()=>requestAnimationFrame(placeNo));
+}
+
+function placeNo(){                       // "NON" pose a cote du "OUI" au depart
+  const r = qYes.getBoundingClientRect();
+  const w = qNo.offsetWidth || 120;
+  qNo.style.left = Math.min(window.innerWidth - w - 16, r.right + 24) + 'px';
+  qNo.style.top  = r.top + 'px';
+}
+
+function dodgeNo(){                       // ...puis il s'enfuit des qu'on l'approche
+  const w = qNo.offsetWidth || 120, h = qNo.offsetHeight || 54;
+  let x, y, tries=0;
+  do{
+    x = 16 + Math.random()*(window.innerWidth  - w - 32);
+    y = 90 + Math.random()*(window.innerHeight - h - 170);
+    tries++;
+  }while(tries<12 && x > window.innerWidth-w-150 && y < 120);  // evite le bouton SON
+  qNo.style.left = Math.max(8, x) + 'px';
+  qNo.style.top  = Math.max(70, y) + 'px';
+}
+qNo.addEventListener('pointerenter', dodgeNo);
+qNo.addEventListener('pointerdown', e=>{ e.preventDefault(); dodgeNo(); });
+qNo.addEventListener('touchstart', e=>{ e.preventDefault(); dodgeNo(); }, {passive:false});
+qNo.addEventListener('click', e=>{
+  e.preventDefault();
+  qNote.textContent = 'impossible... il n\'y a pas de "non".';
+  dodgeNo();
+});
+
+qYes.addEventListener('click', ()=>{
+  if(qYes.disabled) return;
+  qYes.disabled = true;
+  qNote.textContent = ACKS[qIdx] || 'merci.';
+  setTimeout(()=>{
+    qIdx++;
+    if(qIdx >= QUESTIONS.length) finish();
+    else showQuestion();
+  }, 1200);
+});
+
+window.addEventListener('resize', ()=>{
+  if(screens.question.classList.contains('active')) placeNo();
+});
+
+document.querySelectorAll('[data-nav]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const a=b.dataset.nav;
+    if(a==='prev') gotoChapter(cur-1);
+    else if(a==='next') gotoChapter(cur+1);
+    else if(a==='toggle') togglePlay();
+    else if(a==='menu') backToMenu();
+    else if(a==='replay') startStory();
+  });
+});
+
+/* ---------------- CONFETTI ---------------- */
+function spawnConfetti(){
+  const box=document.getElementById('confetti');
+  box.innerHTML='';
+  const cols=['#57e8d8','#ffd166','#ff6b9d','#f4f0ff'];
+  for(let i=0;i<48;i++){
+    const c=document.createElement('div');
+    c.className='cf';
+    c.style.left=Math.random()*100+'%';
+    c.style.background=cols[i%cols.length];
+    c.style.animationDuration=(2.6+Math.random()*2.6)+'s';
+    c.style.animationDelay=(Math.random()*1.2)+'s';
+    box.appendChild(c);
+  }
+}
+
+/* ============================================================
+   MUSIQUE
+   1) Si le fichier <audio id="track"> se charge, il est joue
+      en boucle en fond (c'est le mp3 depose dans le dossier).
+   2) Sinon, une melodie piano lente est generee dans le
+      navigateur (voir plus bas).
+   ============================================================ */
+let actx=null, master=null, musicOn=true, started=false, schedTimer=null;
+let audioNodes=null, loopTime=0, useTrack=false;
+const VOL=0.6;                       // volume de la musique generee
+const TRACK_VOL=0.75;               // volume du fichier mp3
+const trackEl=document.getElementById('track');
+
+function fadeAudioEl(el,to,ms){
+  const from=el.volume||0, t0=performance.now();
+  clearInterval(el._fade);
+  el._fade=setInterval(()=>{
+    const k=Math.min(1,(performance.now()-t0)/ms);
+    el.volume=Math.max(0,Math.min(1,from+(to-from)*k));
+    if(k>=1) clearInterval(el._fade);
+  },30);
+}
+
+function midi(m){ return 440*Math.pow(2,(m-69)/12); }
+function rnd(x){ return (Math.random()*2-1)*x; }
+
+const BPM=56, SPB=60/BPM;            // tempo tres lent
+const LOOP_BEATS=32;                 // 8 mesures, 4 accords tenus
+
+// re mineur : Dm - Bb - F - C  (chaque accord dure 2 mesures = 8 temps)
+const CHORDS=[
+  { bass:38, roll:[50,57,62,65] },  // Dm : re3 la3 re4 fa4
+  { bass:34, roll:[46,53,58,62] },  // Bb : sib2 fa3 sib3 re4
+  { bass:41, roll:[45,48,53,57] },  // F  : la2 do3 fa3 la3
+  { bass:36, roll:[43,48,52,55] }   // C  : sol2 do3 mi3 sol3
+];
+const CHORD_BEATS=8;
+
+// melodie : rare, tenue, beaucoup d'air.  [temps, duree en temps, note MIDI]
+const MELODY=[
+  [2,3,69],[5,2,65],[7,1,62],
+  [10,3,70],[13,2,69],[15,1,65],
+  [18,4,72],[23,1,69],
+  [26,3,67],[29,2,65],[31,1,64]
+];
+
+function buildAudio(){
+  actx=new (window.AudioContext||window.webkitAudioContext)();
+  master=actx.createGain(); master.gain.value=0;
+  const filt=actx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=2200;
+  const delay=actx.createDelay(); delay.delayTime.value=0.36;   // grande resonance
+  const fb=actx.createGain(); fb.gain.value=0.34;
+  const wet=actx.createGain(); wet.gain.value=0.6;
+  const comp=actx.createDynamicsCompressor();
+  comp.threshold.value=-16; comp.ratio.value=4; comp.attack.value=0.004; comp.release.value=0.3;
+  delay.connect(fb); fb.connect(delay);
+  filt.connect(master); delay.connect(wet); wet.connect(master);
+  master.connect(comp); comp.connect(actx.destination);
+  audioNodes={filt,delay};
+}
+
+// note de piano feutree : attaque douce, longue traine
+function pianoNote(f,t,dur,vel){
+  if(t < actx.currentTime - 0.05) return;
+  const out=actx.createGain(); out.gain.value=0;
+  out.connect(audioNodes.filt); out.connect(audioNodes.delay);
+  const peak=0.13*vel;
+  const rel=Math.min(7, dur*SPB+3.2);
+  out.gain.setValueAtTime(0.0001,t);
+  out.gain.linearRampToValueAtTime(peak,t+0.02);
+  out.gain.exponentialRampToValueAtTime(peak*0.32,t+0.8);
+  out.gain.exponentialRampToValueAtTime(0.0001,t+rel);
+  const parts=[[1,0.62],[2,0.26],[3,0.09],[4,0.04]];
+  parts.forEach(([mult,amp],i)=>{
+    const dets = i===0 ? [-2.5,2.5] : [0];       // fondamentale legerement desaccordee (piano droit)
+    dets.forEach(det=>{
+      const o=actx.createOscillator();
+      o.type = i<2 ? 'triangle' : 'sine';
+      o.frequency.value=f*mult;
+      o.detune.value=det;
+      const g=actx.createGain(); g.gain.value=amp*(det===0?1:0.5);
+      o.connect(g); g.connect(out);
+      o.start(t); o.stop(t+rel+0.3);
+    });
+  });
+}
+
+// nappe grave tres discrete sous chaque accord
+function subNote(f,t,dur,vel){
+  if(t < actx.currentTime - 0.05) return;
+  const o=actx.createOscillator(); o.type='sine'; o.frequency.value=f;
+  const g=actx.createGain(); g.gain.value=0;
+  o.connect(g); g.connect(audioNodes.filt);
+  const peak=0.028*vel;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(peak,t+1.6);
+  g.gain.setValueAtTime(peak,t+dur-2);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.start(t); o.stop(t+dur+0.3);
+}
+
+function scheduleLoop(t0){
+  CHORDS.forEach((c,i)=>{
+    const ct=t0 + i*CHORD_BEATS*SPB;
+    const dur=CHORD_BEATS*SPB;
+    subNote(midi(c.bass), ct, dur+2, 1);
+    pianoNote(midi(c.bass), ct + rnd(0.02), CHORD_BEATS, 0.5);          // fondamentale main gauche
+    c.roll.forEach((m,k)=> pianoNote(midi(m), ct + 0.11*k + rnd(0.02), CHORD_BEATS, 0.34 - k*0.03)); // accord roule
+  });
+  MELODY.forEach(([b,d,m])=> pianoNote(midi(m), t0 + b*SPB + rnd(0.03), d, 0.58 + Math.random()*0.12));
+}
+
+function scheduler(){
+  while(loopTime < actx.currentTime + 1.2){
+    scheduleLoop(loopTime);
+    loopTime += LOOP_BEATS*SPB;
+  }
+  schedTimer=setTimeout(scheduler,250);
+}
+
+// ambiance piano generee (repli si le mp3 ne se charge pas)
+function startGenerated(){
+  try{
+    buildAudio();
+    loopTime=actx.currentTime+0.5;
+    master.gain.linearRampToValueAtTime(musicOn?VOL:0, actx.currentTime+3.5);
+    scheduler();
+  }catch(err){ /* audio indisponible */ }
+}
+
+function startMusic(){
+  if(started){
+    if(useTrack){ if(trackEl.paused && musicOn) trackEl.play().catch(()=>{}); }
+    else if(actx && actx.state==='suspended'){ actx.resume(); }
+    return;
+  }
+  started=true;
+  trackEl.volume=0;
+  const p=trackEl.play();
+  if(p && p.then){
+    p.then(()=>{                       // 1) le mp3 joue
+      useTrack=true;
+      fadeAudioEl(trackEl, musicOn?TRACK_VOL:0, 3000);
+    }).catch(()=>{                     // 2) repli : piano genere
+      useTrack=false;
+      startGenerated();
+    });
+  } else {
+    setTimeout(()=>{
+      if(!trackEl.paused){ useTrack=true; fadeAudioEl(trackEl, musicOn?TRACK_VOL:0, 3000); }
+      else { startGenerated(); }
+    },300);
+  }
+}
+
+function toggleMute(){
+  musicOn=!musicOn;
+  if(useTrack){
+    fadeAudioEl(trackEl, musicOn?TRACK_VOL:0, 500);
+  } else if(master){
+    master.gain.linearRampToValueAtTime(musicOn?VOL:0, (actx.currentTime||0)+0.5);
+  }
+  const label = 'MUSIQUE : '+(musicOn?'ON':'OFF');
+  const mi=menuItems.find(m=>m.dataset.act==='music');
+  if(mi) mi.textContent=label;
+  document.getElementById('muteBtn').innerHTML='&#9834; SON : '+(musicOn?'ON':'OFF');
+}
+document.getElementById('muteBtn').addEventListener('click',()=>{
+  if(!started){ startMusic(); return; }   // 1er clic : demarre la musique
+  toggleMute();
+});
+</script>
+</body>
+</html>
